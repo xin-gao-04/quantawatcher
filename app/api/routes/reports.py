@@ -5,7 +5,8 @@ from pydantic import BaseModel
 
 from app.core.config import get_settings
 from app.notifiers.factory import build_notifier
-from app.reports.brief_data import load_brief_data, save_brief_data
+from app.connectors.brief_data_source import fetch_morning_brief_data
+from app.reports.brief_data import save_brief_data
 from app.reports.brief_store import load_morning_brief_draft, save_morning_brief_draft
 from app.reports.morning_brief import build_morning_brief
 
@@ -21,7 +22,7 @@ class MorningBriefPayload(BaseModel):
 def get_morning_brief() -> dict[str, str]:
     settings = get_settings()
     draft = load_morning_brief_draft(settings.data_dir)
-    data = load_brief_data(settings.morning_brief_data_path)
+    data = fetch_morning_brief_data(settings)
     brief = build_morning_brief(draft, data)
     return {"content": brief}
 
@@ -39,7 +40,7 @@ def save_morning_brief(payload: MorningBriefPayload) -> dict[str, str]:
 def send_morning_brief() -> dict[str, str]:
     settings = get_settings()
     draft = load_morning_brief_draft(settings.data_dir)
-    data = load_brief_data(settings.morning_brief_data_path)
+    data = fetch_morning_brief_data(settings)
     brief = build_morning_brief(draft, data)
     notifier = build_notifier(settings)
     notifier.send(brief, severity="info", tags=["report", "morning", "manual"])
@@ -49,7 +50,7 @@ def send_morning_brief() -> dict[str, str]:
 @router.get("/morning-brief/data")
 def get_morning_brief_data() -> dict[str, object]:
     settings = get_settings()
-    data = load_brief_data(settings.morning_brief_data_path) or {}
+    data = fetch_morning_brief_data(settings) or {}
     return {"data": data}
 
 
