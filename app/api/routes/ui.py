@@ -74,6 +74,7 @@ def ui_index() -> str:
         <div class="row">
           <button onclick="refreshBrief()">刷新晨报数据</button>
           <button class="secondary" onclick="sendBrief()">发送晨报</button>
+          <button class="secondary" onclick="clearDraft()">清空草稿</button>
         </div>
         <div class="muted">刷新会拉取 A 股行情（AkShare）。发送将走当前 notifier。</div>
       </div>
@@ -105,6 +106,11 @@ def ui_index() -> str:
       }
       async function refreshBrief() {
         await fetch('/reports/morning-brief/refresh', { method: 'POST' });
+        await loadPreview();
+      }
+      async function clearDraft() {
+        await fetch('/reports/morning-brief', { method: 'DELETE' });
+        document.getElementById('draft').value = '';
         await loadPreview();
       }
       async function sendBrief() {

@@ -8,7 +8,8 @@ def load_morning_brief_draft(data_dir: str) -> Optional[str]:
     draft_path = Path(data_dir) / "morning_brief.md"
     if not draft_path.exists():
         return None
-    return draft_path.read_text(encoding="utf-8")
+    content = draft_path.read_text(encoding="utf-8")
+    return content if content.strip() else None
 
 
 def save_morning_brief_draft(data_dir: str, content: str) -> None:

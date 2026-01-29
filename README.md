@@ -283,6 +283,7 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 - 保存晨报草稿：`POST /reports/morning-brief`
 - 获取晨报内容：`GET /reports/morning-brief`
 - 手动发送晨报：`POST /reports/morning-brief/send`
+- 清空草稿（使用结构化数据）：`DELETE /reports/morning-brief`
 - 脚本发送：`powershell -File scripts/send_morning_brief.ps1 -File data/morning_brief.md`
 
 ### Web 界面（无需 API 工具）

@@ -23,6 +23,8 @@ def test_morning_brief_roundtrip(tmp_path) -> None:
         resp = client.get("/reports/morning-brief")
         assert resp.status_code == 200
         assert resp.json()["content"].startswith("# Draft")
+        resp = client.delete("/reports/morning-brief")
+        assert resp.status_code == 200
         resp = client.post("/reports/morning-brief/send")
         assert resp.status_code == 200
 

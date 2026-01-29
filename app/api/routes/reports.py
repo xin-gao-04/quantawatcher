@@ -39,6 +39,13 @@ def save_morning_brief(payload: MorningBriefPayload) -> dict[str, str]:
     return {"status": "saved"}
 
 
+@router.delete("/morning-brief")
+def clear_morning_brief() -> dict[str, str]:
+    settings = get_settings()
+    save_morning_brief_draft(settings.data_dir, "")
+    return {"status": "cleared"}
+
+
 @router.post("/morning-brief/send")
 def send_morning_brief() -> dict[str, str]:
     settings = get_settings()
