@@ -19,11 +19,15 @@ class Settings(BaseSettings):
     poll_interval_sec: int = 60
     morning_brief_hour: int = 8
     morning_brief_minute: int = 30
+    morning_brief_refresh_hour: int = 8
+    morning_brief_refresh_minute: int = 20
 
     notifier_kind: str = "wecom"
     wecom_webhook_url: Optional[str] = None
     outbox_dir: str = "data/outbox"
     morning_brief_data_path: str = "data/morning_brief_data.json"
+    watchlist_path: str = "data/watchlist.json"
+    morning_brief_top_n: int = 10
 
     disable_scheduler: bool = False
 

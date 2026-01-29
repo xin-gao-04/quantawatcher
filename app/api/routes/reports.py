@@ -6,9 +6,12 @@ from pydantic import BaseModel
 from app.core.config import get_settings
 from app.notifiers.factory import build_notifier
 from app.connectors.brief_data_source import fetch_morning_brief_data
+from app.connectors.akshare_snapshot import fetch_market_top_movers, fetch_watchlist_snapshot
 from app.reports.brief_data import save_brief_data
 from app.reports.brief_store import load_morning_brief_draft, save_morning_brief_draft
 from app.reports.morning_brief import build_morning_brief
+from app.reports.brief_builder import build_brief_data
+from app.core.watchlist import load_watchlist
 
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -61,3 +64,19 @@ def save_morning_brief_data(payload: dict) -> dict[str, str]:
         raise HTTPException(status_code=400, detail="data_required")
     save_brief_data(settings.morning_brief_data_path, payload)
     return {"status": "saved"}
+
+
+@router.post("/morning-brief/refresh")
+def refresh_morning_brief_data() -> dict[str, str]:
+    settings = get_settings()
+    watchlist = load_watchlist(settings.watchlist_path)
+    symbols = [item.get("symbol") for item in watchlist if item.get("symbol")]
+    watchlist_snapshot = fetch_watchlist_snapshot(symbols)
+    tops = fetch_market_top_movers(settings.morning_brief_top_n)
+    payload = build_brief_data(
+        watchlist_snapshot=watchlist_snapshot,
+        top_gainers=tops.get("top_gainers", []),
+        top_turnover=tops.get("top_turnover", []),
+    )
+    save_brief_data(settings.morning_brief_data_path, payload)
+    return {"status": "refreshed"}

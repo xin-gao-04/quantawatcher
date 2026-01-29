@@ -9,8 +9,12 @@ from app.core.config import Settings
 from app.storage.sqlite import SqliteStorage
 from app.notifiers.factory import build_notifier
 from app.connectors.brief_data_source import fetch_morning_brief_data
+from app.connectors.akshare_snapshot import fetch_market_top_movers, fetch_watchlist_snapshot
 from app.reports.brief_store import load_morning_brief_draft
 from app.reports.morning_brief import build_morning_brief
+from app.reports.brief_builder import build_brief_data
+from app.core.watchlist import load_watchlist
+from app.reports.brief_data import save_brief_data
 
 
 logger = logging.getLogger(__name__)
@@ -40,6 +44,13 @@ class SchedulerService:
             hour=self._settings.morning_brief_hour,
             minute=self._settings.morning_brief_minute,
             id="morning_brief",
+        )
+        self._scheduler.add_job(
+            self.refresh_morning_brief_data,
+            "cron",
+            hour=self._settings.morning_brief_refresh_hour,
+            minute=self._settings.morning_brief_refresh_minute,
+            id="morning_brief_refresh",
         )
         self._scheduler.start()
         logger.info("scheduler_started")
@@ -86,6 +97,35 @@ class SchedulerService:
             end_ts = datetime.now(timezone.utc)
             self._storage.record_task_run(
                 "send_morning_brief",
+                start_ts.isoformat(),
+                end_ts.isoformat(),
+                status,
+                error,
+            )
+
+    def refresh_morning_brief_data(self) -> None:
+        start_ts = datetime.now(timezone.utc)
+        try:
+            watchlist = load_watchlist(self._settings.watchlist_path)
+            symbols = [item.get("symbol") for item in watchlist if item.get("symbol")]
+            watchlist_snapshot = fetch_watchlist_snapshot(symbols)
+            tops = fetch_market_top_movers(self._settings.morning_brief_top_n)
+            payload = build_brief_data(
+                watchlist_snapshot=watchlist_snapshot,
+                top_gainers=tops.get("top_gainers", []),
+                top_turnover=tops.get("top_turnover", []),
+            )
+            save_brief_data(self._settings.morning_brief_data_path, payload)
+            status = "success"
+            error = None
+        except Exception as exc:  # pragma: no cover - external dependency
+            logger.exception("refresh_morning_brief_failed")
+            status = "failed"
+            error = str(exc)
+        finally:
+            end_ts = datetime.now(timezone.utc)
+            self._storage.record_task_run(
+                "refresh_morning_brief",
                 start_ts.isoformat(),
                 end_ts.isoformat(),
                 status,

@@ -1,6 +1,7 @@
 data/*
 !data/morning_brief.md
 !data/morning_brief_data.json
+!data/watchlist.json
 .env
 __pycache__/
 .pytest_cache/

@@ -270,7 +270,7 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 ## 工程化落地（从 M0 开始）
 
 ### 阶段成果与技术积累
-- 阶段文档：`doc/phases/M0.md`、`doc/phases/M1.md`、`doc/phases/M1.1.md`、`doc/phases/M1.2.md`、`doc/phases/M1.3.md`
+- 阶段文档：`doc/phases/M0.md`、`doc/phases/M1.md`、`doc/phases/M1.1.md`、`doc/phases/M1.2.md`、`doc/phases/M1.3.md`、`doc/phases/M2.md`
 - 技术积累：`doc/tech/tech_log.md`
 
 ### 本地开发命令（happy path）
@@ -290,6 +290,19 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 - 读取数据：`GET /reports/morning-brief/data`
 - 保存数据：`POST /reports/morning-brief/data`
 - 当前数据源：本地 JSON 文件（后续可替换为外部数据源）
+
+### A股行情数据源（最快路径）
+- 数据源：AkShare（`pip install akshare`）
+- watchlist：`data/watchlist.json`
+- 刷新晨报数据：`POST /reports/morning-brief/refresh`
+- 脚本刷新：`powershell -File scripts/refresh_morning_brief.ps1`
+- watchlist 示例：
+  ```json
+  [
+    {"symbol": "000001", "name": "平安银行"},
+    {"symbol": "600519", "name": "贵州茅台"}
+  ]
+  ```
 
 ### 环境变量与配置
 - 示例：`.env.example`
