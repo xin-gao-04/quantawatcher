@@ -1,0 +1,1 @@
+"""QuantaWatcher application package."""

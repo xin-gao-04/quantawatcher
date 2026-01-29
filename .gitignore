@@ -1,0 +1,6 @@
+data/*
+!data/morning_brief.md
+.env
+__pycache__/
+.pytest_cache/
+*.pyc
