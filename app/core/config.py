@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     notifier_kind: str = "wecom"
     wecom_webhook_url: Optional[str] = None
     outbox_dir: str = "data/outbox"
+    morning_brief_data_path: str = "data/morning_brief_data.json"
 
     disable_scheduler: bool = False
 

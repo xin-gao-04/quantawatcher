@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.core.config import get_settings
 from app.notifiers.factory import build_notifier
+from app.reports.brief_data import load_brief_data, save_brief_data
 from app.reports.brief_store import load_morning_brief_draft, save_morning_brief_draft
 from app.reports.morning_brief import build_morning_brief
 
@@ -20,7 +21,8 @@ class MorningBriefPayload(BaseModel):
 def get_morning_brief() -> dict[str, str]:
     settings = get_settings()
     draft = load_morning_brief_draft(settings.data_dir)
-    brief = build_morning_brief(draft)
+    data = load_brief_data(settings.morning_brief_data_path)
+    brief = build_morning_brief(draft, data)
     return {"content": brief}
 
 
@@ -37,7 +39,24 @@ def save_morning_brief(payload: MorningBriefPayload) -> dict[str, str]:
 def send_morning_brief() -> dict[str, str]:
     settings = get_settings()
     draft = load_morning_brief_draft(settings.data_dir)
-    brief = build_morning_brief(draft)
+    data = load_brief_data(settings.morning_brief_data_path)
+    brief = build_morning_brief(draft, data)
     notifier = build_notifier(settings)
     notifier.send(brief, severity="info", tags=["report", "morning", "manual"])
     return {"status": "sent"}
+
+
+@router.get("/morning-brief/data")
+def get_morning_brief_data() -> dict[str, object]:
+    settings = get_settings()
+    data = load_brief_data(settings.morning_brief_data_path) or {}
+    return {"data": data}
+
+
+@router.post("/morning-brief/data")
+def save_morning_brief_data(payload: dict) -> dict[str, str]:
+    settings = get_settings()
+    if not payload:
+        raise HTTPException(status_code=400, detail="data_required")
+    save_brief_data(settings.morning_brief_data_path, payload)
+    return {"status": "saved"}

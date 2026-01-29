@@ -8,6 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.core.config import Settings
 from app.storage.sqlite import SqliteStorage
 from app.notifiers.factory import build_notifier
+from app.reports.brief_data import load_brief_data
 from app.reports.brief_store import load_morning_brief_draft
 from app.reports.morning_brief import build_morning_brief
 
@@ -72,7 +73,8 @@ class SchedulerService:
         start_ts = datetime.now(timezone.utc)
         try:
             draft = load_morning_brief_draft(self._settings.data_dir)
-            brief = build_morning_brief(draft)
+            data = load_brief_data(self._settings.morning_brief_data_path)
+            brief = build_morning_brief(draft, data)
             self._notifier.send(brief, severity="info", tags=["report", "morning"])
             status = "success"
             error = None

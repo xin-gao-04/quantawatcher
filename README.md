@@ -270,7 +270,7 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 ## 工程化落地（从 M0 开始）
 
 ### 阶段成果与技术积累
-- 阶段文档：`doc/phases/M0.md`、`doc/phases/M1.md`、`doc/phases/M1.1.md`
+- 阶段文档：`doc/phases/M0.md`、`doc/phases/M1.md`、`doc/phases/M1.1.md`、`doc/phases/M1.2.md`
 - 技术积累：`doc/tech/tech_log.md`
 
 ### 本地开发命令（happy path）
@@ -284,6 +284,11 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 - 获取晨报内容：`GET /reports/morning-brief`
 - 手动发送晨报：`POST /reports/morning-brief/send`
 - 脚本发送：`powershell -File scripts/send_morning_brief.ps1 -File data/morning_brief.md`
+
+### 晨报结构化数据（可选）
+- 数据文件：`data/morning_brief_data.json`
+- 读取数据：`GET /reports/morning-brief/data`
+- 保存数据：`POST /reports/morning-brief/data`
 
 ### 环境变量与配置
 - 示例：`.env.example`
