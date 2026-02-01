@@ -44,6 +44,7 @@
 - `QW_AKSHARE_RETRIES`：重试次数
 - `QW_AKSHARE_BACKOFF_SEC`：重试退避
 - `QW_AKSHARE_SPOT_SOURCES`：现货来源顺序（`em,sina`）
+- `QW_AKSHARE_USE_PROXY`：AkShare 是否使用代理
 - `QW_MARKET_SNAPSHOT_SOURCES`：快照来源优先级（`sina_market,cache,akshare,eastmoney_direct,tencent`）
 - `QW_MARKET_SNAPSHOT_CACHE_PATH`：快照缓存文件
 - `QW_MARKET_SNAPSHOT_CACHE_TTL_SEC`：快照缓存有效期（秒）

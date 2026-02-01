@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
 from app.connectors.akshare_snapshot import _require_akshare, _retry
@@ -14,18 +15,11 @@ def fetch_technicals(symbols: List[str]) -> List[Dict[str, Any]]:
     results: List[Dict[str, Any]] = []
     for symbol in symbols:
         try:
-            df = _retry(
-                lambda: ak.stock_zh_a_hist(symbol=symbol, period="daily", adjust="qfq"),
-                settings.akshare_retries,
-                settings.akshare_backoff_sec,
-                settings.akshare_research_timeout_sec,
-            )
+            df = _fetch_hist(ak, settings, symbol)
             if df is None or df.empty:
                 results.append(_empty(symbol))
                 continue
-            closes = df["收盘"].astype(float).tolist()
-            highs = df["最高"].astype(float).tolist()
-            lows = df["最低"].astype(float).tolist()
+            closes, highs, lows, amounts = _extract_ohlc(df)
             ma20 = _sma(closes, 20)
             ma60 = _sma(closes, 60)
             rsi14 = _rsi(closes, 14)
@@ -33,6 +27,7 @@ def fetch_technicals(symbols: List[str]) -> List[Dict[str, Any]]:
             support = min(lows[-20:]) if len(lows) >= 20 else min(lows)
             resistance = max(highs[-20:]) if len(highs) >= 20 else max(highs)
             trend = _trend(ma20, ma60)
+            vol_ratio = _vol_ratio(amounts, 20)
             results.append(
                 {
                     "symbol": symbol,
@@ -44,13 +39,72 @@ def fetch_technicals(symbols: List[str]) -> List[Dict[str, Any]]:
                     "ma60": ma60,
                     "rsi14": rsi14,
                     "macd": macd_val,
-                    "vol_ratio": "NA",
+                    "vol_ratio": vol_ratio,
                     "breakout_note": "NA",
                 }
             )
         except Exception:
             results.append(_empty(symbol))
     return results
+
+
+def _fetch_hist(ak, settings: Settings, symbol: str):
+    try:
+        return _retry(
+            lambda: ak.stock_zh_a_hist(symbol=symbol, period="daily", adjust="qfq"),
+            settings.akshare_retries,
+            settings.akshare_backoff_sec,
+            settings.akshare_research_timeout_sec,
+        )
+    except Exception:
+        tx_symbol = _to_tx_symbol(symbol)
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=420)
+        return _retry(
+            lambda: ak.stock_zh_a_hist_tx(
+                symbol=tx_symbol,
+                start_date=start_date.strftime("%Y%m%d"),
+                end_date=end_date.strftime("%Y%m%d"),
+                adjust="qfq",
+                timeout=settings.akshare_research_timeout_sec,
+            ),
+            settings.akshare_retries,
+            settings.akshare_backoff_sec,
+            settings.akshare_research_timeout_sec,
+        )
+
+
+def _extract_ohlc(df):
+    if "收盘" in df.columns:
+        closes = df["收盘"].astype(float).tolist()
+        highs = df["最高"].astype(float).tolist()
+        lows = df["最低"].astype(float).tolist()
+        amounts = df["成交额"].astype(float).tolist() if "成交额" in df.columns else []
+        return closes, highs, lows, amounts
+    closes = df["close"].astype(float).tolist() if "close" in df.columns else []
+    highs = df["high"].astype(float).tolist() if "high" in df.columns else []
+    lows = df["low"].astype(float).tolist() if "low" in df.columns else []
+    amounts = df["amount"].astype(float).tolist() if "amount" in df.columns else []
+    return closes, highs, lows, amounts
+
+
+def _to_tx_symbol(symbol: str) -> str:
+    if symbol.startswith(("sh", "sz")):
+        return symbol
+    if symbol.startswith("6") or symbol.startswith("5") or symbol.startswith("9"):
+        return f"sh{symbol}"
+    return f"sz{symbol}"
+
+
+def _vol_ratio(amounts: List[float], window: int) -> Any:
+    if not amounts:
+        return "NA"
+    if len(amounts) < window + 1:
+        return amounts[-1] / (sum(amounts) / len(amounts)) if amounts else "NA"
+    avg = sum(amounts[-window:]) / window
+    if avg == 0:
+        return "NA"
+    return amounts[-1] / avg
 
 
 def _empty(symbol: str) -> Dict[str, Any]:

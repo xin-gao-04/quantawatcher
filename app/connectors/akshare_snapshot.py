@@ -21,7 +21,8 @@ _EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 def _require_akshare():
     qw_http_proxy = os.getenv("QW_HTTP_PROXY")
     qw_https_proxy = os.getenv("QW_HTTPS_PROXY")
-    if qw_http_proxy or qw_https_proxy:
+    use_proxy = os.getenv("QW_AKSHARE_USE_PROXY", "true").lower() not in {"0", "false", "no"}
+    if use_proxy and (qw_http_proxy or qw_https_proxy):
         if qw_http_proxy:
             os.environ["HTTP_PROXY"] = qw_http_proxy
         if qw_https_proxy:

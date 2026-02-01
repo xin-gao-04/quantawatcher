@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     enable_morning_brief_draft: bool = False
     http_proxy: Optional[str] = None
     https_proxy: Optional[str] = None
+    akshare_use_proxy: bool = True
     akshare_retries: int = 5
     akshare_backoff_sec: float = 2.0
     akshare_snapshot_timeout_sec: float = 12.0

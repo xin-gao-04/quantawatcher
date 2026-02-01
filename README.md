@@ -308,6 +308,7 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 - 刷新晨报数据：`POST /reports/morning-brief/refresh`
 - 脚本刷新：`powershell -File scripts/refresh_morning_brief.ps1`
 - 如访问外网需要代理：设置 `QW_HTTP_PROXY` / `QW_HTTPS_PROXY`（例如 `http://127.0.0.1:6275`）
+- AkShare 是否使用代理：`QW_AKSHARE_USE_PROXY=true`（若 AkShare 接口被代理阻断可设为 false）
 - 若 AkShare 失败：自动降级为腾讯行情（仅 watchlist）
 - AkShare 重试：`QW_AKSHARE_RETRIES` 与 `QW_AKSHARE_BACKOFF_SEC` 可调大
 - AkShare 超时：`QW_AKSHARE_SNAPSHOT_TIMEOUT_SEC` / `QW_AKSHARE_RESEARCH_TIMEOUT_SEC`
