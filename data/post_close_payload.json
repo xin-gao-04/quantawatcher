@@ -1,0 +1,24 @@
+{
+  "date": "2026-01-31",
+  "horizon": "短线(1-5天) / 中线(1-4周)",
+  "market": {
+    "index_summary": "沪深300/中证500波动偏高",
+    "liquidity": "成交额高位",
+    "risk_on_off": "偏中性"
+  },
+  "watchlist": [
+    {"symbol": "000063", "name": "中兴通讯", "last": null, "pct_chg": null, "amount": null},
+    {"symbol": "000547", "name": "航天发展", "last": null, "pct_chg": null, "amount": null},
+    {"symbol": "002281", "name": "光迅科技", "last": null, "pct_chg": null, "amount": null},
+    {"symbol": "002364", "name": "中恒电气", "last": null, "pct_chg": null, "amount": null},
+    {"symbol": "513330", "name": "纳指ETF", "last": null, "pct_chg": null, "amount": null},
+    {"symbol": "601600", "name": "中国铝业", "last": null, "pct_chg": null, "amount": null}
+  ],
+  "sectors": [],
+  "top_gainers": [],
+  "top_turnover": [],
+  "events": [],
+  "risk_flags": ["宏观不确定性", "情绪波动"],
+  "constraints": ["仅A股", "单票不超20%仓位", "控制回撤"],
+  "notes": ["示例数据：可用 refresh 后填充行情字段"]
+}

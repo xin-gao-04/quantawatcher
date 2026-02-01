@@ -9,7 +9,7 @@ from app.core.config import Settings
 from app.storage.sqlite import SqliteStorage
 from app.notifiers.factory import build_notifier
 from app.connectors.brief_data_source import fetch_morning_brief_data
-from app.connectors.akshare_snapshot import fetch_market_top_movers, fetch_watchlist_snapshot
+from app.connectors.akshare_snapshot import fetch_market_snapshot
 from app.reports.brief_store import load_morning_brief_draft
 from app.reports.morning_brief import build_morning_brief
 from app.reports.brief_builder import build_brief_data
@@ -83,7 +83,9 @@ class SchedulerService:
     def send_morning_brief(self) -> None:
         start_ts = datetime.now(timezone.utc)
         try:
-            draft = load_morning_brief_draft(self._settings.data_dir)
+            draft = load_morning_brief_draft(
+                self._settings.data_dir, self._settings.enable_morning_brief_draft
+            )
             data = fetch_morning_brief_data(self._settings)
             brief = build_morning_brief(draft, data)
             self._notifier.send(brief, severity="info", tags=["report", "morning"])
@@ -108,13 +110,23 @@ class SchedulerService:
         try:
             watchlist = load_watchlist(self._settings.watchlist_path)
             symbols = [item.get("symbol") for item in watchlist if item.get("symbol")]
-            watchlist_snapshot = fetch_watchlist_snapshot(symbols)
-            tops = fetch_market_top_movers(self._settings.morning_brief_top_n)
+            snapshot = fetch_market_snapshot(symbols, self._settings.morning_brief_top_n)
+            snapshot_meta = snapshot.get("meta", {}) if isinstance(snapshot, dict) else {}
             payload = build_brief_data(
-                watchlist_snapshot=watchlist_snapshot,
-                top_gainers=tops.get("top_gainers", []),
-                top_turnover=tops.get("top_turnover", []),
+                watchlist_snapshot=snapshot.get("watchlist", []),
+                top_gainers=snapshot.get("top_gainers", []),
+                top_turnover=snapshot.get("top_turnover", []),
             )
+            notes = payload.setdefault("notes", [])
+            notes.append(f"source: {snapshot_meta.get('source', 'akshare')}")
+            if snapshot_meta.get("fallback_used"):
+                fallback_note = f"fallback: {snapshot_meta.get('source', 'unknown')}"
+                if snapshot_meta.get("degraded"):
+                    fallback_note += " (watchlist only)"
+                cache_ts = snapshot_meta.get("cache_ts")
+                if cache_ts:
+                    fallback_note += f" (cache {cache_ts})"
+                notes.append(fallback_note)
             save_brief_data(self._settings.morning_brief_data_path, payload)
             status = "success"
             error = None

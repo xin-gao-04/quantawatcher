@@ -16,3 +16,12 @@ def save_watchlist(path: str, items: List[Dict[str, Any]]) -> None:
     file_path = Path(path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def add_watchlist_item(path: str, item: Dict[str, Any]) -> List[Dict[str, Any]]:
+    items = load_watchlist(path)
+    symbols = {i.get("symbol") for i in items}
+    if item.get("symbol") not in symbols:
+        items.append(item)
+    save_watchlist(path, items)
+    return items

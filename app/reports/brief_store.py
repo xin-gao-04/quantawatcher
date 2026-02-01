@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Optional
 
 
-def load_morning_brief_draft(data_dir: str) -> Optional[str]:
+def load_morning_brief_draft(data_dir: str, enabled: bool = True) -> Optional[str]:
+    if not enabled:
+        return None
     draft_path = Path(data_dir) / "morning_brief.md"
     if not draft_path.exists():
         return None

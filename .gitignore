@@ -2,6 +2,9 @@ data/*
 !data/morning_brief.md
 !data/morning_brief_data.json
 !data/watchlist.json
+!data/post_close_payload.json
+!data/watchlist_fundamentals.json
+!data/watchlist_technicals.json
 .env
 __pycache__/
 .pytest_cache/

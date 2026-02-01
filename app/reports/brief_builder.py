@@ -14,7 +14,7 @@ def build_brief_data(
     sectors: List[str] = []
     symbols = [_format_symbol(item) for item in watchlist_snapshot[:10]]
     risks: List[str] = []
-    notes = ["数据源：AkShare（A股现货）"]
+    notes: List[str] = []
 
     top_gainers_lines = [_format_symbol(item) for item in top_gainers]
     top_turnover_lines = [_format_symbol(item) for item in top_turnover]
@@ -30,6 +30,7 @@ def build_brief_data(
         "symbols": symbols,
         "risks": risks,
         "notes": notes,
+        "watchlist": watchlist_snapshot,
         "top_gainers": top_gainers,
         "top_turnover": top_turnover,
     }

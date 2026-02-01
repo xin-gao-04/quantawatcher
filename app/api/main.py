@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.api.routes.reports import router as reports_router
+from app.api.routes.watchlist import router as watchlist_router
 from app.api.routes.ui import router as ui_router
 from app.scheduler.service import SchedulerService
 
@@ -32,6 +33,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="QuantaWatcher", lifespan=lifespan)
 app.include_router(reports_router)
 app.include_router(ui_router)
+app.include_router(watchlist_router)
 
 
 @app.get("/health")

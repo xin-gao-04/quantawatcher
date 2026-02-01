@@ -17,3 +17,4 @@ def test_build_brief_data() -> None:
     )
     assert "highlights" in payload
     assert "symbols" in payload
+    assert "watchlist" in payload

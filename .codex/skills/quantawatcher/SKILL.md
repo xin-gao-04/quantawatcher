@@ -14,6 +14,7 @@ Use this skill when the user asks to design, implement, refactor, or productioni
 - plugin interfaces and loading, plugin isolation strategy
 - storage schema, migrations, config/versioning
 - morning brief, post-close reports, replay/evals
+- post-close prompt generation for LLM analysis
 - deployment (Windows service/systemd), observability, alerting
 
 Do NOT use this skill for general stock recommendations or discretionary trading advice. This system outputs signals and operational telemetry, not investment guarantees.
@@ -148,6 +149,10 @@ When producing implementation output:
 - Provide commands to run/tests
 - Provide config keys and defaults
 - Avoid long speculative market commentary
+
+## Post-close prompt guidance
+- Collect data for LLM prompts as structured JSON
+- Prompt should request three plans (conservative/balanced/aggressive) with confidence scores (0-100)
 
 ## Trigger examples (for better auto-invocation)
 - “为 QuantaWatcher 加一个盘中异动规则：量能突变 + 冷却窗口”

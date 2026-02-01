@@ -270,14 +270,17 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 ## 工程化落地（从 M0 开始）
 
 ### 阶段成果与技术积累
-- 阶段文档：`doc/phases/M0.md`、`doc/phases/M1.md`、`doc/phases/M1.1.md`、`doc/phases/M1.2.md`、`doc/phases/M1.3.md`、`doc/phases/M2.md`、`doc/phases/M2.1.md`
+- 阶段文档：`doc/phases/M0.md`、`doc/phases/M1.md`、`doc/phases/M1.1.md`、`doc/phases/M1.2.md`、`doc/phases/M1.3.md`、`doc/phases/M2.md`、`doc/phases/M2.1.md`、`doc/phases/M3.md`
 - 技术积累：`doc/tech/tech_log.md`
+- 数据源说明：`doc/tech/data_sources.md`
+- 盘后复盘提示词：`doc/tech/post_close_prompt.md`
 
 ### 本地开发命令（happy path）
 - 安装依赖：`pip install -r requirements.txt`
 - 若遇到代理/SSL 问题：`$env:NO_PROXY='*'; pip install -r requirements.txt`
 - 启动服务：`python -m uvicorn app.api.main:app --reload`
 - Windows 快捷启动：`powershell -File scripts/dev.ps1`
+- 网络诊断：`powershell -File scripts/diagnose_network.ps1`
 
 ### 晨报手动流程（可立即使用）
 - 保存晨报草稿：`POST /reports/morning-brief`
@@ -288,18 +291,43 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 
 ### Web 界面（无需 API 工具）
 - 访问：`http://127.0.0.1:8000/` 或 `http://127.0.0.1:8000/ui`
+- 若不需要草稿：设置 `QW_ENABLE_MORNING_BRIEF_DRAFT=false`（默认）
+ - 刷新后状态会显示 watchlist/榜单数量，如失败会提示原因
+- 盘后提示词：点击“生成盘后提示词”可直接复制
 
 ### 晨报结构化数据（可选）
 - 数据文件：`data/morning_brief_data.json`
 - 读取数据：`GET /reports/morning-brief/data`
 - 保存数据：`POST /reports/morning-brief/data`
 - 当前数据源：本地 JSON 文件（后续可替换为外部数据源）
+ - 晨报正文会输出：涨幅榜 / 成交额榜（若有数据）
 
 ### A股行情数据源（最快路径）
 - 数据源：AkShare（`pip install akshare`）
 - watchlist：`data/watchlist.json`
 - 刷新晨报数据：`POST /reports/morning-brief/refresh`
 - 脚本刷新：`powershell -File scripts/refresh_morning_brief.ps1`
+- 如访问外网需要代理：设置 `QW_HTTP_PROXY` / `QW_HTTPS_PROXY`（例如 `http://127.0.0.1:6275`）
+- 若 AkShare 失败：自动降级为腾讯行情（仅 watchlist）
+- AkShare 重试：`QW_AKSHARE_RETRIES` 与 `QW_AKSHARE_BACKOFF_SEC` 可调大
+- AkShare 超时：`QW_AKSHARE_SNAPSHOT_TIMEOUT_SEC` / `QW_AKSHARE_RESEARCH_TIMEOUT_SEC`
+- AkShare 现货来源顺序：`QW_AKSHARE_SPOT_SOURCES=em,sina`（按顺序尝试）
+- 市场快照来源优先级：`QW_MARKET_SNAPSHOT_SOURCES=sina_market,cache,akshare,eastmoney_direct,tencent`
+- 快照缓存：`QW_MARKET_SNAPSHOT_CACHE_PATH` / `QW_MARKET_SNAPSHOT_CACHE_TTL_SEC`（秒，0 表示不过期）
+- Eastmoney 直连开关：`QW_EASTMONEY_DIRECT_ENABLED=true`
+- Eastmoney 主机：`QW_EASTMONEY_HOSTS=82.push2.eastmoney.com,push2.eastmoney.com`
+- Eastmoney 分页/限速：`QW_EASTMONEY_PAGE_SIZE` / `QW_EASTMONEY_MAX_PAGES` / `QW_EASTMONEY_PAGE_DELAY_SEC`
+- Eastmoney 请求头：`QW_EASTMONEY_USER_AGENT` / `QW_EASTMONEY_COOKIE`
+- Eastmoney 自动 Cookie：`QW_EASTMONEY_AUTO_COOKIE` / `QW_EASTMONEY_FORCE_COOKIE` / `QW_EASTMONEY_COOKIE_VERIFY` / `QW_EASTMONEY_COOKIE_URL` / `QW_EASTMONEY_COOKIE_PATH` / `QW_EASTMONEY_COOKIE_TTL_SEC`
+- Sina 全市场源：`QW_SINA_MARKET_URL` / `QW_SINA_MARKET_NODE` / `QW_SINA_MARKET_PAGE_SIZE` / `QW_SINA_MARKET_MAX_PAGES` / `QW_SINA_MARKET_PAGE_DELAY_SEC`
+- Sina 请求头：`QW_SINA_MARKET_USER_AGENT`
+- Sina 重试：`QW_SINA_MARKET_RETRIES` / `QW_SINA_MARKET_BACKOFF_SEC`
+- Sina 并发与完整性：`QW_SINA_MARKET_CONCURRENCY` / `QW_SINA_MARKET_MIN_ROWS`
+- 腾讯行情超时/重试：`QW_TENCENT_TIMEOUT_SEC` / `QW_TENCENT_RETRIES` / `QW_TENCENT_BACKOFF_SEC`
+- 禁用降级：`QW_DISABLE_FALLBACK=true`（失败则返回错误）
+- 研究数据刷新开关：`QW_RESEARCH_ENABLED`（关闭可显著降低慢网络影响）
+- 研究数据抽样数量：`QW_RESEARCH_MAX_SYMBOLS`
+- 刷新状态：`GET /reports/morning-brief/refresh/status`
 - watchlist 示例：
   ```json
   [
@@ -311,3 +339,11 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 ### 环境变量与配置
 - 示例：`.env.example`
 - 统一前缀：`QW_`
+
+### 自选研究补充数据
+- 价值面：`data/watchlist_fundamentals.json`
+- 技术面：`data/watchlist_technicals.json`
+
+### 自选管理（Web）
+- 在页面“自选内容”处输入代码/名称可添加
+- API：`GET /watchlist`, `POST /watchlist`, `DELETE /watchlist/{symbol}`
