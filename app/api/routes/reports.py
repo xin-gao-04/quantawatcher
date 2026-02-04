@@ -22,6 +22,11 @@ from app.reports.post_close_prompt import build_post_close_prompt
 from app.connectors.akshare_fundamentals import fetch_fundamentals
 from app.connectors.akshare_technicals import fetch_technicals
 from app.reports.watchlist_research import save_research_data
+from app.core.report_params import load_report_params, save_report_params
+from app.indicators.history import update_history
+from app.reports.post_close_builder import build_post_close_data
+from app.reports.post_close_data import load_post_close_data, save_post_close_data
+from app.reports.post_close_report import build_post_close_report
 
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -111,6 +116,7 @@ def _run_refresh(settings) -> None:
         symbols = [item.get("symbol") for item in watchlist if item.get("symbol")]
         logger.info("refresh_snapshot_start", extra={"symbols": len(symbols)})
         snapshot = fetch_market_snapshot(symbols, settings.morning_brief_top_n)
+        snapshot = _enrich_snapshot_names(snapshot, watchlist)
         snapshot_meta = snapshot.get("meta", {}) if isinstance(snapshot, dict) else {}
         source = snapshot_meta.get("source", "akshare")
         fallback_used = bool(snapshot_meta.get("fallback_used"))
@@ -126,10 +132,18 @@ def _run_refresh(settings) -> None:
                 "fallback_used": fallback_used,
             },
         )
+        params = load_report_params(settings.report_params_path, settings)
+        history_payload = update_history(
+            settings.watchlist_history_path,
+            datetime.now().strftime("%Y-%m-%d"),
+            snapshot.get("watchlist", []),
+        )
         payload = build_brief_data(
             watchlist_snapshot=snapshot.get("watchlist", []),
             top_gainers=snapshot.get("top_gainers", []),
             top_turnover=snapshot.get("top_turnover", []),
+            history_payload=history_payload,
+            params=params,
         )
         notes = payload.setdefault("notes", [])
         notes.append(f"source: {source}")
@@ -163,6 +177,7 @@ def _run_refresh(settings) -> None:
                 "degraded": degraded,
                 "cache_ts": cache_ts,
                 "snapshot_duration_ms": int((time.monotonic() - start_ts) * 1000),
+                "history_date": payload.get("indicators", {}).get("history_latest_date"),
             },
         )
         if snapshot_meta.get("error"):
@@ -242,6 +257,117 @@ def post_close_prompt() -> dict[str, object]:
     return {"prompt": prompt, "payload": payload}
 
 
+@router.get("/post-close")
+def get_post_close() -> dict[str, object]:
+    settings = get_settings()
+    data = load_post_close_data(settings.post_close_data_path) or {}
+    content = build_post_close_report(data)
+    return {"content": content, "data": data}
+
+
+@router.get("/post-close/data")
+def get_post_close_data() -> dict[str, object]:
+    settings = get_settings()
+    data = load_post_close_data(settings.post_close_data_path) or {}
+    return {"data": data}
+
+
+@router.post("/post-close/send")
+def send_post_close() -> dict[str, str]:
+    settings = get_settings()
+    data = load_post_close_data(settings.post_close_data_path) or {}
+    content = build_post_close_report(data)
+    notifier = build_notifier(settings)
+    notifier.send(content, severity="info", tags=["report", "post_close"])
+    return {"status": "sent"}
+
+
+@router.post("/post-close/refresh")
+def refresh_post_close(background_tasks: BackgroundTasks) -> dict[str, object]:
+    settings = get_settings()
+    save_refresh_status(settings.post_close_refresh_status_path, new_status("running", {"stage": "snapshot"}))
+    background_tasks.add_task(_run_post_close_refresh, settings)
+    return {"status": "queued"}
+
+
+def _run_post_close_refresh(settings) -> None:
+    start_ts = time.monotonic()
+    try:
+        watchlist = load_watchlist(settings.watchlist_path)
+        symbols = [item.get("symbol") for item in watchlist if item.get("symbol")]
+        snapshot = fetch_market_snapshot(symbols, settings.morning_brief_top_n)
+        snapshot = _enrich_snapshot_names(snapshot, watchlist)
+        snapshot_meta = snapshot.get("meta", {}) if isinstance(snapshot, dict) else {}
+        params = load_report_params(settings.report_params_path, settings)
+        history_payload = update_history(
+            settings.watchlist_history_path,
+            datetime.now().strftime("%Y-%m-%d"),
+            snapshot.get("watchlist", []),
+        )
+        payload = build_post_close_data(
+            watchlist_snapshot=snapshot.get("watchlist", []),
+            history_payload=history_payload,
+            params=params,
+        )
+        notes = payload.setdefault("notes", [])
+        source = snapshot_meta.get("source", "akshare")
+        notes.append(f"source: {source}")
+        if snapshot_meta.get("fallback_used"):
+            fallback_note = f"fallback: {source}"
+            if snapshot_meta.get("degraded"):
+                fallback_note += " (watchlist only)"
+            cache_ts = snapshot_meta.get("cache_ts")
+            if cache_ts:
+                fallback_note += f" (cache {cache_ts})"
+            notes.append(fallback_note)
+        save_post_close_data(settings.post_close_data_path, payload)
+        status_payload = new_status(
+            "success",
+            {
+                "watchlist_count": len(payload.get("watchlist", [])),
+                "abnormal_count": len(payload.get("abnormal_moves", [])),
+                "source": source,
+                "fallback_used": bool(snapshot_meta.get("fallback_used")),
+                "degraded": bool(snapshot_meta.get("degraded")),
+                "cache_ts": snapshot_meta.get("cache_ts"),
+                "snapshot_duration_ms": int((time.monotonic() - start_ts) * 1000),
+            },
+        )
+        save_refresh_status(settings.post_close_refresh_status_path, status_payload)
+    except Exception as exc:
+        save_post_close_data(
+            settings.post_close_data_path,
+            {"date": datetime.now().strftime("%Y-%m-%d"), "notes": [f"refresh_failed: {exc}"]},
+        )
+        save_refresh_status(
+            settings.post_close_refresh_status_path,
+            new_status("failed", {"error": str(exc), "stage": "snapshot"}),
+        )
+
+
+@router.get("/post-close/refresh/status")
+def post_close_refresh_status() -> dict[str, object]:
+    settings = get_settings()
+    status = load_refresh_status(settings.post_close_refresh_status_path) or {"state": "idle"}
+    return {"status": status}
+
+
+@router.get("/params")
+def get_report_params() -> dict[str, object]:
+    settings = get_settings()
+    params = load_report_params(settings.report_params_path, settings)
+    return {"params": params}
+
+
+@router.post("/params")
+def update_report_params(payload: dict) -> dict[str, object]:
+    settings = get_settings()
+    if not payload:
+        raise HTTPException(status_code=400, detail="params_required")
+    params = save_report_params(settings.report_params_path, payload, settings)
+    return {"params": params}
+
+
 def _file_mtime_iso(path: str) -> str:
     file_path = Path(path)
     if not file_path.exists():
@@ -260,3 +386,17 @@ def _top_by_key(items, key: str, limit: int):
     if not items:
         return []
     return sorted(items, key=lambda item: _num(item.get(key)), reverse=True)[:limit]
+
+
+def _enrich_snapshot_names(snapshot: dict, watchlist: list[dict]) -> dict:
+    lookup = {item.get("symbol"): item.get("name") for item in watchlist if item.get("symbol")}
+    for key in ("watchlist", "top_gainers", "top_turnover"):
+        items = snapshot.get(key)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not item.get("name"):
+                name = lookup.get(item.get("symbol"))
+                if name:
+                    item["name"] = name
+    return snapshot

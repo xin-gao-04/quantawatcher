@@ -21,12 +21,19 @@ class Settings(BaseSettings):
     morning_brief_minute: int = 30
     morning_brief_refresh_hour: int = 8
     morning_brief_refresh_minute: int = 20
+    post_close_hour: int = 15
+    post_close_minute: int = 30
+    post_close_refresh_hour: int = 15
+    post_close_refresh_minute: int = 10
 
     notifier_kind: str = "wecom"
     wecom_webhook_url: Optional[str] = None
     outbox_dir: str = "data/outbox"
     morning_brief_data_path: str = "data/morning_brief_data.json"
+    post_close_data_path: str = "data/post_close_report_data.json"
     watchlist_path: str = "data/watchlist.json"
+    watchlist_history_path: str = "data/watchlist_history.json"
+    report_params_path: str = "data/report_params.json"
     morning_brief_top_n: int = 10
     enable_morning_brief_draft: bool = False
     http_proxy: Optional[str] = None
@@ -84,6 +91,7 @@ class Settings(BaseSettings):
     tencent_backoff_sec: float = 0.5
     disable_fallback: bool = False
     refresh_status_path: str = "data/morning_brief_refresh_status.json"
+    post_close_refresh_status_path: str = "data/post_close_refresh_status.json"
     refresh_min_interval_sec: int = 60
     watchlist_fundamentals_path: str = "data/watchlist_fundamentals.json"
     watchlist_technicals_path: str = "data/watchlist_technicals.json"

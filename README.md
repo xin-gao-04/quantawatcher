@@ -281,6 +281,7 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 - 启动服务：`python -m uvicorn app.api.main:app --reload`
 - Windows 快捷启动：`powershell -File scripts/dev.ps1`
 - 网络诊断：`powershell -File scripts/diagnose_network.ps1`
+- 运行测试：`PYTHONPATH=. python -m pytest -q`
 
 ### 晨报手动流程（可立即使用）
 - 保存晨报草稿：`POST /reports/morning-brief`
@@ -289,11 +290,20 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 - 清空草稿（使用结构化数据）：`DELETE /reports/morning-brief`
 - 脚本发送：`powershell -File scripts/send_morning_brief.ps1 -File data/morning_brief.md`
 
+### 盘后复盘流程（结构化）
+- 生成盘后数据：`POST /reports/post-close/refresh`
+- 获取盘后报告：`GET /reports/post-close`
+- 获取盘后数据：`GET /reports/post-close/data`
+- 发送盘后报告：`POST /reports/post-close/send`
+- 刷新状态：`GET /reports/post-close/refresh/status`
+
 ### Web 界面（无需 API 工具）
 - 访问：`http://127.0.0.1:8000/` 或 `http://127.0.0.1:8000/ui`
 - 若不需要草稿：设置 `QW_ENABLE_MORNING_BRIEF_DRAFT=false`（默认）
  - 刷新后状态会显示 watchlist/榜单数量，如失败会提示原因
 - 盘后提示词：点击“生成盘后提示词”可直接复制
+- 盘后复盘：点击“刷新盘后数据 / 发送盘后复盘”
+- 参数设置：在“报告参数”面板调整动量窗口、异常阈值与盘后时间
 
 ### 晨报结构化数据（可选）
 - 数据文件：`data/morning_brief_data.json`
@@ -301,6 +311,10 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 - 保存数据：`POST /reports/morning-brief/data`
 - 当前数据源：本地 JSON 文件（后续可替换为外部数据源）
  - 晨报正文会输出：涨幅榜 / 成交额榜（若有数据）
+
+### 盘后结构化数据（可选）
+- 数据文件：`data/post_close_report_data.json`
+- 读取数据：`GET /reports/post-close/data`
 
 ### A股行情数据源（最快路径）
 - 数据源：AkShare（`pip install akshare`）
@@ -328,6 +342,14 @@ M4 插件体系固化 + 运维观测（约 1 周量级）
 - 禁用降级：`QW_DISABLE_FALLBACK=true`（失败则返回错误）
 - 研究数据刷新开关：`QW_RESEARCH_ENABLED`（关闭可显著降低慢网络影响）
 - 研究数据抽样数量：`QW_RESEARCH_MAX_SYMBOLS`
+
+### 报告参数与排程
+- 报告参数文件：`QW_REPORT_PARAMS_PATH`（默认 `data/report_params.json`）
+- 盘后报告时间：`QW_POST_CLOSE_HOUR` / `QW_POST_CLOSE_MINUTE`
+- 盘后数据刷新时间：`QW_POST_CLOSE_REFRESH_HOUR` / `QW_POST_CLOSE_REFRESH_MINUTE`
+- 盘后数据文件：`QW_POST_CLOSE_DATA_PATH`
+- 盘后刷新状态：`QW_POST_CLOSE_REFRESH_STATUS_PATH`
+- watchlist 历史缓存：`QW_WATCHLIST_HISTORY_PATH`
 - 刷新状态：`GET /reports/morning-brief/refresh/status`
 - watchlist 示例：
   ```json

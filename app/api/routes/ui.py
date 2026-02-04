@@ -281,6 +281,30 @@ def ui_index() -> str:
           </div>
           <div class="muted">用于手动粘贴给大模型进行分析。</div>
         </div>
+        <div class="card">
+          <h2>盘后复盘</h2>
+          <div class="markdown" v-html="postCloseHtml"></div>
+          <div class="muted">
+            <span :class="['spinner', postCloseRefreshing ? '' : 'hidden']"></span>
+            {{ postCloseStatusText }}
+          </div>
+          <div class="toolbar" style="margin-top:12px;">
+            <button @click="refreshPostClose" :disabled="postCloseRefreshing">刷新盘后数据</button>
+            <button class="secondary" @click="sendPostClose">发送盘后复盘</button>
+          </div>
+        </div>
+        <div class="card">
+          <h2>报告参数</h2>
+          <div class="toolbar" style="margin-bottom:10px; flex-wrap: wrap;">
+            <input v-model="params.momentum_days" placeholder="动量窗口(如 5,20)" />
+            <input v-model="params.abnormal_pct" placeholder="异常阈值(%)" />
+            <input v-model="params.strong_pct" placeholder="强弱阈值(%)" />
+            <input v-model="params.post_close_hour" placeholder="盘后小时(24h)" />
+            <input v-model="params.post_close_minute" placeholder="盘后分钟" />
+            <button class="secondary" @click="saveParams">保存参数</button>
+          </div>
+          <div class="muted">参数保存后会影响晨报/盘后复盘计算与定时。</div>
+        </div>
       </div>
     </div>
     <script>
@@ -298,7 +322,18 @@ def ui_index() -> str:
             status: {},
             symbolInput: '',
             nameInput: '',
-            postClosePrompt: ''
+            postClosePrompt: '',
+            postCloseHtml: '',
+            postCloseStatus: {},
+            postCloseRefreshing: false,
+            postCloseStatusText: '状态：未刷新',
+            params: {
+              momentum_days: '5,20',
+              abnormal_pct: '3',
+              strong_pct: '2',
+              post_close_hour: '15',
+              post_close_minute: '30'
+            }
           };
         },
         computed: {
@@ -358,9 +393,10 @@ def ui_index() -> str:
           },
           async loadPreview() {
             try {
-              const [briefResp, statusResp] = await Promise.all([
+              const [briefResp, statusResp, paramsResp] = await Promise.all([
                 fetch('/reports/morning-brief'),
-                fetch('/reports/morning-brief/refresh/status')
+                fetch('/reports/morning-brief/refresh/status'),
+                fetch('/reports/params')
               ]);
               const data = await briefResp.json();
               this.briefHtml = marked.parse(data.content || '');
@@ -380,6 +416,11 @@ def ui_index() -> str:
                 this.status = statusData.status || {};
                 this.statusText = this.status.state ? `状态：${this.status.state}` : '状态：未刷新';
               }
+              if (paramsResp.ok) {
+                const paramsData = await paramsResp.json();
+                this.applyParams(paramsData.params || {});
+              }
+              await this.loadPostClose();
             } catch (err) {
               console.error(err);
               this.statusText = '状态：加载失败';
@@ -444,6 +485,98 @@ def ui_index() -> str:
             const resp = await fetch('/reports/post-close/prompt');
             const data = await resp.json();
             this.postClosePrompt = data.prompt || '';
+          },
+          async loadPostClose() {
+            try {
+              const resp = await fetch('/reports/post-close');
+              const data = await resp.json();
+              this.postCloseHtml = marked.parse(data.content || '');
+            } catch (err) {
+              console.error(err);
+              this.postCloseStatusText = '状态：加载失败';
+            }
+          },
+          async refreshPostClose() {
+            this.postCloseRefreshing = true;
+            this.postCloseStatusText = '状态：刷新中...';
+            try {
+              const resp = await fetch('/reports/post-close/refresh', { method: 'POST' });
+              const data = await resp.json();
+              if (data.status === 'cached') {
+                this.postCloseStatusText = '状态：刷新过于频繁（使用缓存）';
+                await this.loadPostClose();
+                this.postCloseRefreshing = false;
+                return;
+              }
+              await this.pollPostCloseStatus();
+            } catch (err) {
+              console.error(err);
+              this.postCloseStatusText = '状态：刷新失败';
+              this.postCloseRefreshing = false;
+            }
+          },
+          async pollPostCloseStatus() {
+            let finished = false;
+            for (let i = 0; i < 30; i++) {
+              const resp = await fetch('/reports/post-close/refresh/status');
+              const data = await resp.json();
+              this.postCloseStatus = data.status || {};
+              const state = this.postCloseStatus.state || 'idle';
+              if (state === 'success') {
+                this.postCloseStatusText = `状态：已刷新 watchlist=${this.postCloseStatus.watchlist_count || 0}` +
+                  ` 异常=${this.postCloseStatus.abnormal_count || 0}`;
+                await this.loadPostClose();
+                finished = true;
+                break;
+              }
+              if (state === 'failed') {
+                this.postCloseStatusText = '状态：刷新失败';
+                alert('盘后刷新失败: ' + (this.postCloseStatus.error || 'unknown'));
+                await this.loadPostClose();
+                finished = true;
+                break;
+              }
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            if (!finished) {
+              this.postCloseStatusText = '状态：刷新超时（保留旧内容）';
+              await this.loadPostClose();
+            }
+            this.postCloseRefreshing = false;
+          },
+          async sendPostClose() {
+            await fetch('/reports/post-close/send', { method: 'POST' });
+            alert('已发送（如使用本地 notifier，请检查 data/outbox）');
+          },
+          applyParams(params) {
+            if (params.momentum_days) {
+              this.params.momentum_days = Array.isArray(params.momentum_days)
+                ? params.momentum_days.join(',')
+                : String(params.momentum_days);
+            }
+            if (params.abnormal_pct !== undefined) this.params.abnormal_pct = String(params.abnormal_pct);
+            if (params.strong_pct !== undefined) this.params.strong_pct = String(params.strong_pct);
+            if (params.post_close_hour !== undefined) this.params.post_close_hour = String(params.post_close_hour);
+            if (params.post_close_minute !== undefined) this.params.post_close_minute = String(params.post_close_minute);
+          },
+          async saveParams() {
+            const payload = {
+              momentum_days: String(this.params.momentum_days || '')
+                .split(',')
+                .map(item => item.trim())
+                .filter(Boolean)
+                .map(item => Number(item)),
+              abnormal_pct: Number(this.params.abnormal_pct),
+              strong_pct: Number(this.params.strong_pct),
+              post_close_hour: Number(this.params.post_close_hour),
+              post_close_minute: Number(this.params.post_close_minute)
+            };
+            await fetch('/reports/params', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            alert('参数已保存');
           },
           async copyPrompt() {
             if (!this.postClosePrompt.trim()) {

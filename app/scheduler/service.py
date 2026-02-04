@@ -15,6 +15,11 @@ from app.reports.morning_brief import build_morning_brief
 from app.reports.brief_builder import build_brief_data
 from app.core.watchlist import load_watchlist
 from app.reports.brief_data import save_brief_data
+from app.core.report_params import load_report_params
+from app.indicators.history import update_history
+from app.reports.post_close_builder import build_post_close_data
+from app.reports.post_close_data import save_post_close_data, load_post_close_data
+from app.reports.post_close_report import build_post_close_report
 
 
 logger = logging.getLogger(__name__)
@@ -51,6 +56,20 @@ class SchedulerService:
             hour=self._settings.morning_brief_refresh_hour,
             minute=self._settings.morning_brief_refresh_minute,
             id="morning_brief_refresh",
+        )
+        self._scheduler.add_job(
+            self.send_post_close_report,
+            "cron",
+            hour=self._settings.post_close_hour,
+            minute=self._settings.post_close_minute,
+            id="post_close_report",
+        )
+        self._scheduler.add_job(
+            self.refresh_post_close_data,
+            "cron",
+            hour=self._settings.post_close_refresh_hour,
+            minute=self._settings.post_close_refresh_minute,
+            id="post_close_refresh",
         )
         self._scheduler.start()
         logger.info("scheduler_started")
@@ -111,11 +130,20 @@ class SchedulerService:
             watchlist = load_watchlist(self._settings.watchlist_path)
             symbols = [item.get("symbol") for item in watchlist if item.get("symbol")]
             snapshot = fetch_market_snapshot(symbols, self._settings.morning_brief_top_n)
+            snapshot = _enrich_snapshot_names(snapshot, watchlist)
             snapshot_meta = snapshot.get("meta", {}) if isinstance(snapshot, dict) else {}
+            params = load_report_params(self._settings.report_params_path, self._settings)
+            history_payload = update_history(
+                self._settings.watchlist_history_path,
+                datetime.now().strftime("%Y-%m-%d"),
+                snapshot.get("watchlist", []),
+            )
             payload = build_brief_data(
                 watchlist_snapshot=snapshot.get("watchlist", []),
                 top_gainers=snapshot.get("top_gainers", []),
                 top_turnover=snapshot.get("top_turnover", []),
+                history_payload=history_payload,
+                params=params,
             )
             notes = payload.setdefault("notes", [])
             notes.append(f"source: {snapshot_meta.get('source', 'akshare')}")
@@ -143,3 +171,85 @@ class SchedulerService:
                 status,
                 error,
             )
+
+    def refresh_post_close_data(self) -> None:
+        start_ts = datetime.now(timezone.utc)
+        try:
+            watchlist = load_watchlist(self._settings.watchlist_path)
+            symbols = [item.get("symbol") for item in watchlist if item.get("symbol")]
+            snapshot = fetch_market_snapshot(symbols, self._settings.morning_brief_top_n)
+            snapshot = _enrich_snapshot_names(snapshot, watchlist)
+            snapshot_meta = snapshot.get("meta", {}) if isinstance(snapshot, dict) else {}
+            params = load_report_params(self._settings.report_params_path, self._settings)
+            history_payload = update_history(
+                self._settings.watchlist_history_path,
+                datetime.now().strftime("%Y-%m-%d"),
+                snapshot.get("watchlist", []),
+            )
+            payload = build_post_close_data(
+                watchlist_snapshot=snapshot.get("watchlist", []),
+                history_payload=history_payload,
+                params=params,
+            )
+            notes = payload.setdefault("notes", [])
+            notes.append(f"source: {snapshot_meta.get('source', 'akshare')}")
+            if snapshot_meta.get("fallback_used"):
+                fallback_note = f"fallback: {snapshot_meta.get('source', 'unknown')}"
+                if snapshot_meta.get("degraded"):
+                    fallback_note += " (watchlist only)"
+                cache_ts = snapshot_meta.get("cache_ts")
+                if cache_ts:
+                    fallback_note += f" (cache {cache_ts})"
+                notes.append(fallback_note)
+            save_post_close_data(self._settings.post_close_data_path, payload)
+            status = "success"
+            error = None
+        except Exception as exc:  # pragma: no cover - external dependency
+            logger.exception("refresh_post_close_failed")
+            status = "failed"
+            error = str(exc)
+        finally:
+            end_ts = datetime.now(timezone.utc)
+            self._storage.record_task_run(
+                "refresh_post_close",
+                start_ts.isoformat(),
+                end_ts.isoformat(),
+                status,
+                error,
+            )
+
+    def send_post_close_report(self) -> None:
+        start_ts = datetime.now(timezone.utc)
+        try:
+            data = load_post_close_data(self._settings.post_close_data_path) or {}
+            report = build_post_close_report(data)
+            self._notifier.send(report, severity="info", tags=["report", "post_close"])
+            status = "success"
+            error = None
+        except Exception as exc:  # pragma: no cover - placeholder
+            logger.exception("send_post_close_report_failed")
+            status = "failed"
+            error = str(exc)
+        finally:
+            end_ts = datetime.now(timezone.utc)
+            self._storage.record_task_run(
+                "send_post_close_report",
+                start_ts.isoformat(),
+                end_ts.isoformat(),
+                status,
+                error,
+            )
+
+
+def _enrich_snapshot_names(snapshot: dict, watchlist: list[dict]) -> dict:
+    lookup = {item.get("symbol"): item.get("name") for item in watchlist if item.get("symbol")}
+    for key in ("watchlist", "top_gainers", "top_turnover"):
+        items = snapshot.get(key)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not item.get("name"):
+                name = lookup.get(item.get("symbol"))
+                if name:
+                    item["name"] = name
+    return snapshot

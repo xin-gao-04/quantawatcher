@@ -15,6 +15,7 @@ def test_morning_brief_roundtrip(tmp_path) -> None:
     os.environ["QW_OUTBOX_DIR"] = str(tmp_path / "outbox")
     os.environ["QW_MORNING_BRIEF_DATA_PATH"] = str(tmp_path / "brief.json")
     os.environ["QW_WATCHLIST_PATH"] = str(tmp_path / "watchlist.json")
+    os.environ["QW_REPORT_PARAMS_PATH"] = str(tmp_path / "params.json")
     os.environ["QW_ENABLE_MORNING_BRIEF_DRAFT"] = "true"
     get_settings.cache_clear()
 
@@ -35,6 +36,11 @@ def test_morning_brief_roundtrip(tmp_path) -> None:
         assert resp.status_code == 200
         assert resp.json()["data"]["highlights"] == ["X"]
 
+        params = client.get("/reports/params")
+        assert params.status_code == 200
+        resp = client.post("/reports/params", json={"abnormal_pct": 4})
+        assert resp.status_code == 200
+
 
 def test_morning_brief_refresh(tmp_path, monkeypatch) -> None:
     os.environ["QW_DISABLE_SCHEDULER"] = "true"
@@ -43,6 +49,8 @@ def test_morning_brief_refresh(tmp_path, monkeypatch) -> None:
     os.environ["QW_OUTBOX_DIR"] = str(tmp_path / "outbox")
     os.environ["QW_MORNING_BRIEF_DATA_PATH"] = str(tmp_path / "brief.json")
     os.environ["QW_WATCHLIST_PATH"] = str(tmp_path / "watchlist.json")
+    os.environ["QW_REPORT_PARAMS_PATH"] = str(tmp_path / "params.json")
+    os.environ["QW_WATCHLIST_HISTORY_PATH"] = str(tmp_path / "history.json")
     get_settings.cache_clear()
 
     import app.api.routes.reports as reports_module
